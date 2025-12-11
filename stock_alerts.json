@@ -1,0 +1,9 @@
+{
+  "GOOGL": {
+    "lower_limit": 320.0,
+    "upper_limit": 323.0,
+    "chat_id": 8190894603,
+    "last_price": 320.21,
+    "last_alert": null
+  }
+}
