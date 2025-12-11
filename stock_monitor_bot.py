@@ -11,6 +11,12 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # Import market alerts module
 from market_alerts import start_market_alerts
 
+# Import portfolio modules
+from portfolio_commands import (
+    buy_command, sell_command, portfolio_command,
+    positions_command, history_command, set_price_getter
+)
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -132,18 +138,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = """
 🤖 *Stock Price Monitor Bot*
 
-Commands:
+*Price Alerts:*
 /set - Set price alerts for a stock
 /list - View all your alerts
 /remove - Remove a stock alert
 /price - Check current stock price
+
+*Portfolio Management:*
+/buy - Record a stock purchase
+/sell - Record a stock sale
+/portfolio - View your complete portfolio
+/positions - Detailed view of a position
+/history - View your trade history
+
 /help - Show this help message
 
-*How to set alerts:*
-/set AAPL 150 180
-This sets alerts for Apple stock with lower limit $150 and upper limit $180
-
 *Stock symbols:* Use Yahoo Finance symbols (e.g., AAPL, TSLA, GOOGL, MSFT)
+
+*Automatic Alerts:*
+🔔 Market open/close notifications
+📊 Unusual volume alerts
 """
     await update.message.reply_text(welcome_message, parse_mode='Markdown')
 
@@ -388,16 +402,26 @@ def main():
         print("Set it with: export TELEGRAM_BOT_TOKEN='your_token_here'")
         return
 
+    # Set the price getter function for portfolio module
+    set_price_getter(get_stock_price)
+
     # Create the Application
     application = Application.builder().token(token).build()
 
-    # Register command handlers
+    # Register command handlers - Price Alerts
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("set", set_alert))
     application.add_handler(CommandHandler("list", list_alerts))
     application.add_handler(CommandHandler("remove", remove_alert))
     application.add_handler(CommandHandler("price", check_price))
+
+    # Register command handlers - Portfolio Management
+    application.add_handler(CommandHandler("buy", buy_command))
+    application.add_handler(CommandHandler("sell", sell_command))
+    application.add_handler(CommandHandler("portfolio", portfolio_command))
+    application.add_handler(CommandHandler("positions", positions_command))
+    application.add_handler(CommandHandler("history", history_command))
 
     # Error handler
     application.add_error_handler(error_handler)
