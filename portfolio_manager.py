@@ -60,11 +60,11 @@ SECTOR_MAP = {
 
 PORTFOLIO_FILE = 'portfolio_data.json'
 
-
 class Portfolio:
     def __init__(self, chat_id):
         self.chat_id = chat_id
         self.positions = {}
+        self.buying_power = 0.0  # Cash available
         self.load_portfolio()
 
     def load_portfolio(self):
@@ -73,13 +73,17 @@ class Portfolio:
             try:
                 with open(PORTFOLIO_FILE, 'r') as f:
                     all_portfolios = json.load(f)
-                    self.positions = all_portfolios.get(str(self.chat_id), {})
-                logger.info(f"Loaded portfolio for chat {self.chat_id}: {len(self.positions)} positions")
+                    portfolio_data = all_portfolios.get(str(self.chat_id), {})
+                    self.positions = portfolio_data.get('positions', {})
+                    self.buying_power = portfolio_data.get('buying_power', 0.0)
+                logger.info(f"Loaded portfolio for chat {self.chat_id}: {len(self.positions)} positions, ${self.buying_power:.2f} buying power")
             except Exception as e:
                 logger.error(f"Error loading portfolio: {e}")
                 self.positions = {}
+                self.buying_power = 0.0
         else:
             self.positions = {}
+            self.buying_power = 0.0
 
     def save_portfolio(self):
         """Save portfolio to JSON file"""
@@ -91,7 +95,10 @@ class Portfolio:
                     all_portfolios = json.load(f)
 
             # Update this chat's portfolio
-            all_portfolios[str(self.chat_id)] = self.positions
+            all_portfolios[str(self.chat_id)] = {
+                'positions': self.positions,
+                'buying_power': self.buying_power
+            }
 
             # Save back
             with open(PORTFOLIO_FILE, 'w') as f:
@@ -177,6 +184,30 @@ class Portfolio:
         logger.info(f"Sold position: {symbol} {shares} shares @ ${price}, P&L: ${realized_pl:.2f}")
 
         return realized_pl
+
+    def add_cash(self, amount):
+        """Add cash to buying power"""
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+
+        self.buying_power += amount
+        self.save_portfolio()
+        logger.info(f"Added ${amount:.2f} cash, new buying power: ${self.buying_power:.2f}")
+        return self.buying_power
+
+    def withdraw_cash(self, amount):
+        """Withdraw cash from buying power"""
+        amount = float(amount)
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+        if amount > self.buying_power:
+            raise ValueError(f"Insufficient buying power. Available: ${self.buying_power:.2f}")
+
+        self.buying_power -= amount
+        self.save_portfolio()
+        logger.info(f"Withdrew ${amount:.2f} cash, new buying power: ${self.buying_power:.2f}")
+        return self.buying_power
 
     def get_sector(self, symbol):
         """Get sector for a symbol"""

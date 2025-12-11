@@ -14,8 +14,12 @@ from market_alerts import start_market_alerts
 # Import portfolio modules
 from portfolio_commands import (
     buy_command, sell_command, portfolio_command,
-    positions_command, history_command, set_price_getter
+    positions_command, history_command, cash_command,
+    withdraw_command, set_price_getter
 )
+
+# Import system monitor
+from system_monitor import get_system_stats, format_system_stats
 
 # Configure logging
 logging.basicConfig(
@@ -150,6 +154,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /portfolio - View your complete portfolio
 /positions - Detailed view of a position
 /history - View your trade history
+
+*Cash Management:*
+/cash - Add buying power
+/withdraw - Withdraw buying power
+
+*System:*
+/system - View NUC hardware stats
 
 /help - Show this help message
 
@@ -295,6 +306,22 @@ async def check_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await checking_msg.edit_text(f"❌ Error fetching price for {symbol}")
 
 
+async def system_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show system stats: /system"""
+    try:
+        checking_msg = await update.message.reply_text("📊 Gathering system stats...")
+
+        stats = get_system_stats()
+        message = format_system_stats(stats)
+
+        await checking_msg.edit_text(message, parse_mode='Markdown')
+        logger.info(f"System stats requested by chat {update.effective_chat.id}")
+
+    except Exception as e:
+        logger.error(f"Error in system_command: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
 def monitor_stocks(bot_token):
     """Background thread to monitor stock prices"""
     logger.info("Stock monitoring thread started")
@@ -422,6 +449,11 @@ def main():
     application.add_handler(CommandHandler("portfolio", portfolio_command))
     application.add_handler(CommandHandler("positions", positions_command))
     application.add_handler(CommandHandler("history", history_command))
+    application.add_handler(CommandHandler("cash", cash_command))
+    application.add_handler(CommandHandler("withdraw", withdraw_command))
+
+    # Register command handlers - System
+    application.add_handler(CommandHandler("system", system_command))
 
     # Error handler
     application.add_error_handler(error_handler)

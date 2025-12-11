@@ -13,12 +13,10 @@ logger = logging.getLogger(__name__)
 # This will be set by main bot
 get_stock_price = None
 
-
 def set_price_getter(price_getter_func):
     """Set the price getter function from main bot"""
     global get_stock_price
     get_stock_price = price_getter_func
-
 
 async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /buy command: /buy SYMBOL SHARES PRICE"""
@@ -62,7 +60,6 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in buy_command: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
-
 
 async def sell_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /sell command: /sell SYMBOL SHARES PRICE"""
@@ -109,7 +106,6 @@ async def sell_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in sell_command: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
-
 async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /portfolio command: Show complete portfolio with analysis"""
     try:
@@ -138,17 +134,21 @@ async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_cost = portfolio_value['total_cost']
         total_pl = portfolio_value['total_pl']
         total_pl_pct = portfolio_value['total_pl_pct']
+        buying_power = portfolio.buying_power
+        total_account_value = total_value + buying_power
 
         pl_emoji = "📈" if total_pl >= 0 else "📉"
 
         message = f"📊 *Your Portfolio* {pl_emoji}\n\n"
-        message += f"*Total Value:* ${total_value:,.2f}\n"
+        message += f"*Stock Value:* ${total_value:,.2f}\n"
+        message += f"*Buying Power:* ${buying_power:,.2f}\n"
+        message += f"*Total Account:* ${total_account_value:,.2f}\n\n"
         message += f"*Cost Basis:* ${total_cost:,.2f}\n"
         message += f"*Profit/Loss:* ${total_pl:+,.2f} ({total_pl_pct:+.2f}%)\n\n"
 
         # AUD conversion (approximate)
         aud_rate = 1.5  # Rough estimate, could make this dynamic
-        message += f"≈ ${total_value * aud_rate:,.2f} AUD\n\n"
+        message += f"≈ ${total_account_value * aud_rate:,.2f} AUD\n\n"
 
         message += "*Holdings:*\n"
         for pos in portfolio_value['positions']:
@@ -186,7 +186,6 @@ async def portfolio_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in portfolio_command: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
-
 
 async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /positions command: Show detailed position info"""
@@ -246,7 +245,6 @@ async def positions_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in positions_command: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
 
-
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /history command: Show all trade history"""
     try:
@@ -257,7 +255,18 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("📭 No trade history yet!")
             return
 
+        # Calculate total realized P&L
+        total_realized_pl = sum(
+            trade.get('realized_pl', 0)
+            for trade in trades
+            if trade['type'] == 'SELL'
+        )
+
         message = "📜 *Trade History*\n\n"
+
+        if total_realized_pl != 0:
+            pl_emoji = "📈" if total_realized_pl >= 0 else "📉"
+            message += f"*Total Realized P&L:* ${total_realized_pl:+,.2f} {pl_emoji}\n\n"
 
         # Show last 20 trades
         for trade in trades[:20]:
@@ -265,15 +274,19 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             emoji = "🟢" if trade_type == "BUY" else "🔴"
             date = trade['date'].split('T')[0]
 
-            message += (
-                f"{emoji} {trade_type} {trade['symbol']}: "
-                f"{trade['shares']:.2f} @ ${trade['price']:.2f} ({date})\n"
+            trade_line = (
+                f"{emoji} *{trade_type}* {trade['symbol']}: "
+                f"{trade['shares']:.2f} @ ${trade['price']:.2f}"
             )
 
             # Show realized P&L for sells
             if trade_type == "SELL" and 'realized_pl' in trade:
                 pl = trade['realized_pl']
-                message += f"   P&L: ${pl:+.2f}\n"
+                pl_emoji = "💰" if pl >= 0 else "💸"
+                trade_line += f" → {pl_emoji} ${pl:+.2f}"
+
+            trade_line += f"\n   📅 {date}\n"
+            message += trade_line
 
         if len(trades) > 20:
             message += f"\n_Showing 20 of {len(trades)} trades_"
@@ -282,4 +295,76 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Error in history_command: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+async def cash_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /cash command: Add cash to buying power"""
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "Usage: /cash AMOUNT\n\n"
+                "Example: /cash 5000\n"
+                "This adds $5000 to your buying power"
+            )
+            return
+
+        amount = float(context.args[0])
+
+        if amount <= 0:
+            await update.message.reply_text("❌ Amount must be positive!")
+            return
+
+        portfolio = get_portfolio(update.effective_chat.id)
+        new_buying_power = portfolio.add_cash(amount)
+
+        message = (
+            f"💵 *Cash Deposited*\n\n"
+            f"Amount: ${amount:,.2f}\n"
+            f"New Buying Power: ${new_buying_power:,.2f}\n\n"
+            f"Use /portfolio to see your updated account"
+        )
+
+        await update.message.reply_text(message, parse_mode='Markdown')
+        logger.info(f"Cash added: ${amount:.2f} by chat {update.effective_chat.id}")
+
+    except ValueError as e:
+        await update.message.reply_text(f"❌ Invalid amount: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in cash_command: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /withdraw command: Withdraw cash from buying power"""
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "Usage: /withdraw AMOUNT\n\n"
+                "Example: /withdraw 1000\n"
+                "This removes $1000 from your buying power"
+            )
+            return
+
+        amount = float(context.args[0])
+
+        if amount <= 0:
+            await update.message.reply_text("❌ Amount must be positive!")
+            return
+
+        portfolio = get_portfolio(update.effective_chat.id)
+        new_buying_power = portfolio.withdraw_cash(amount)
+
+        message = (
+            f"💸 *Cash Withdrawn*\n\n"
+            f"Amount: ${amount:,.2f}\n"
+            f"Remaining Buying Power: ${new_buying_power:,.2f}\n\n"
+            f"Use /portfolio to see your updated account"
+        )
+
+        await update.message.reply_text(message, parse_mode='Markdown')
+        logger.info(f"Cash withdrawn: ${amount:.2f} by chat {update.effective_chat.id}")
+
+    except ValueError as e:
+        await update.message.reply_text(f"❌ {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in withdraw_command: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)}")
