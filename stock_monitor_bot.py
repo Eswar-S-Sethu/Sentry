@@ -8,6 +8,9 @@ import requests
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
+# Import market alerts module
+from market_alerts import start_market_alerts
+
 # Configure logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -398,6 +401,16 @@ def main():
 
     # Error handler
     application.add_error_handler(error_handler)
+
+    # Get unique chat IDs from existing alerts
+    chat_ids = list(set(alert['chat_id'] for alert in stock_alerts.values()))
+
+    # Start market alerts monitoring
+    if chat_ids:
+        start_market_alerts(token, chat_ids, lambda: stock_alerts)
+        logger.info(f"Market alerts enabled for {len(chat_ids)} chat(s)")
+    else:
+        logger.info("No alerts configured yet. Market alerts will start when you set your first alert.")
 
     # Start monitoring thread
     monitor_thread = Thread(target=monitor_stocks, args=(token,), daemon=True)
