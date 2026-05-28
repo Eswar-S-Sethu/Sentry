@@ -29,7 +29,7 @@ playwright install chromium
 Download from [ollama.com](https://ollama.com), then pull the default model:
 
 ```bash
-ollama pull qwen2.5:4b
+ollama pull qwen2.5:3b
 ```
 
 ### 3. Set environment variables
@@ -42,7 +42,7 @@ Optional overrides:
 
 ```bash
 export OLLAMA_HOST='http://localhost:11434'   # default
-export OLLAMA_MODEL='qwen2.5:4b'             # default
+export OLLAMA_MODEL='qwen2.5:3b'             # default
 export POLL_INTERVAL_SECONDS='1800'          # default (30 minutes)
 ```
 
@@ -223,7 +223,7 @@ Sentry/
 |---|---|---|
 | `TELEGRAM_BOT_TOKEN` | required | Bot token from @BotFather |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama API base URL |
-| `OLLAMA_MODEL` | `qwen2.5:4b` | Model to use for matching and intent parsing |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Model to use for matching and intent parsing |
 | `POLL_INTERVAL_SECONDS` | `1800` | How often to check for new jobs (seconds) |
 
 ## Troubleshooting
@@ -240,7 +240,7 @@ Sentry/
 **LLM matching unavailable**
 - Start Ollama: `ollama serve`
 - Confirm the model is downloaded: `ollama list`
-- Pull it if missing: `ollama pull qwen2.5:4b`
+- Pull it if missing: `ollama pull qwen2.5:3b`
 
 **ABN verification fails**
 - Run `playwright install chromium` if not done after install
